@@ -1,0 +1,42 @@
+;; Contract Name: Decentralized Media Library
+;; Description: A smart contract for managing a decentralized media library. Users can add, edit, transfer, delete media entries, and grant access rights with proper validation and permissions.
+
+;; Error Codes
+(define-constant ERR_MEDIA_NOT_FOUND (err u301)) ;; Error when a media entry is not found.
+(define-constant ERR_DUPLICATE_MEDIA (err u302)) ;; Error when attempting to create duplicate media.
+(define-constant ERR_INVALID_NAME (err u303)) ;; Error for invalid media name.
+(define-constant ERR_INVALID_SIZE (err u304)) ;; Error for invalid media size.
+(define-constant ERR_UNAUTHORIZED (err u305)) ;; Error for unauthorized actions.
+(define-constant ERR_INVALID_CATEGORY (err u306)) ;; Error for invalid category name.
+(define-constant ERR_RESTRICTED_ACTION (err u307)) ;; Error for restricted actions.
+(define-constant ERR_ACCESS_DENIED (err u308)) ;; Error for denied access.
+(define-constant ERR_INVALID_ACCESS_GRANT (err u309)) ;; Error for invalid access grant attempts.
+(define-constant ERR_INVALID_PRINCIPAL (err u310))
+
+;; Permissions
+(define-constant LIBRARY_ADMIN tx-sender) ;; Contract administrator (default is the transaction sender).
+
+;; Global Counters and Mappings
+(define-data-var media-count uint u0) ;; Counter to track the total number of media entries.
+
+(define-map media-entries
+  { id: uint } ;; Key: Media ID.
+  {
+    name: (string-ascii 64),         ;; Name of the media.
+    owner: principal,               ;; Owner's principal address.
+    data-size: uint,                ;; Size of the media file.
+    timestamp: uint,                ;; Block height when the media was added.
+    category: (string-ascii 32),    ;; Category of the media.
+    overview: (string-ascii 128),   ;; Brief overview of the media.
+    tags-list: (list 10 (string-ascii 32)) ;; List of tags associated with the media.
+  }
+)
+
+(define-map access-rights
+  { id: uint, user-principal: principal } ;; Key: Media ID and user principal.
+  { 
+    can-access: bool,              ;; Access rights for users
+    granted-by: principal,         ;; Principal who granted the access
+    granted-at: uint              ;; Block height when access was granted
+  }
+)
