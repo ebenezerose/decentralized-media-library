@@ -142,3 +142,81 @@
     (ok new-id)
   )
 )
+
+;; Grant read access to a user for a specific media entry
+(define-public (grant-read-access (id uint) (user principal))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Validate media existence and ownership
+    (asserts! (is-media-present? id) ERR_MEDIA_NOT_FOUND)
+    (asserts! (is-authorized-owner? id tx-sender) ERR_UNAUTHORIZED)
+    (asserts! (not (is-eq user tx-sender)) ERR_INVALID_ACCESS_GRANT)
+    
+    ;; Grant access rights
+    (map-set access-rights
+      { id: id, user-principal: user }
+      { 
+        can-access: true,
+        granted-by: tx-sender,
+        granted-at: block-height
+      }
+    )
+    (ok true)
+  )
+)
+
+;; Revoke read access from a user for a specific media entry
+(define-public (revoke-read-access (id uint) (user principal))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+      (access-info (unwrap! (map-get? access-rights { id: id, user-principal: user }) ERR_UNAUTHORIZED))
+    )
+    ;; Validate media existence and ownership
+    (asserts! (is-media-present? id) ERR_MEDIA_NOT_FOUND)
+    (asserts! (is-authorized-owner? id tx-sender) ERR_UNAUTHORIZED)
+    (asserts! (not (is-eq user tx-sender)) ERR_INVALID_ACCESS_GRANT)
+    
+    ;; Revoke access rights
+    (map-delete access-rights { id: id, user-principal: user })
+    (ok true)
+  )
+)
+
+;; Check if a user has access to a media entry
+(define-read-only (check-access (id uint) (user principal))
+  (ok (has-read-access? id user))
+)
+
+;; Transfer ownership of a media entry.
+(define-public (transfer-ownership (id uint) (new-owner principal))
+  (let
+    (
+      (media-details (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Validate ownership, media existence, and new owner
+    (asserts! (is-media-present? id) ERR_MEDIA_NOT_FOUND)
+    (asserts! (is-authorized-owner? id tx-sender) ERR_UNAUTHORIZED)
+    (asserts! (not (is-eq new-owner tx-sender)) ERR_INVALID_ACCESS_GRANT)
+    (asserts! (validate-principal new-owner) ERR_INVALID_PRINCIPAL)
+
+    ;; Update ownership
+    (map-set media-entries
+      { id: id }
+      (merge media-details { owner: new-owner })
+    )
+
+    ;; Transfer access rights to new owner
+    (map-set access-rights
+      { id: id, user-principal: new-owner }
+      {
+        can-access: true,
+        granted-by: tx-sender,
+        granted-at: block-height
+      }
+    )
+    (ok true)
+  )
+)
