@@ -1,5 +1,6 @@
 ;; Contract Name: Decentralized Media Library
-;; Description: A smart contract for managing a decentralized media library. Users can add, edit, transfer, delete media entries, and grant access rights with proper validation and permissions.
+;; Description: A smart contract for managing a decentralized media library with favorites functionality.
+;; Users can add, edit, transfer, delete media entries, grant access rights, and mark entries as favorites.
 
 ;; Error Codes
 (define-constant ERR_MEDIA_NOT_FOUND (err u301)) ;; Error when a media entry is not found.
@@ -12,6 +13,8 @@
 (define-constant ERR_ACCESS_DENIED (err u308)) ;; Error for denied access.
 (define-constant ERR_INVALID_ACCESS_GRANT (err u309)) ;; Error for invalid access grant attempts.
 (define-constant ERR_INVALID_PRINCIPAL (err u310))
+(define-constant ERR_ALREADY_FAVORITE (err u311)) ;; Error when media is already marked as favorite
+(define-constant ERR_NOT_FAVORITE (err u312)) ;; Error when media is not marked as favorite
 
 ;; Permissions
 (define-constant LIBRARY_ADMIN tx-sender) ;; Contract administrator (default is the transaction sender).
@@ -41,6 +44,15 @@
   }
 )
 
+;; New map for favorites functionality
+(define-map user-favorites
+  { user: principal, media-id: uint }  ;; Key: User principal and media ID
+  {
+    favorited-at: uint,            ;; Block height when favorited
+    last-updated: uint            ;; Block height of last update
+  }
+)
+
 ;; Internal Utility Functions
 
 ;; Check if a media entry exists.
@@ -66,6 +78,11 @@
     access-info (get can-access access-info)
     false
   )
+)
+
+;; Check if a media entry is already favorited by a user
+(define-private (is-favorite? (id uint) (user principal))
+  (is-some (map-get? user-favorites { user: user, media-id: id }))
 )
 
 ;; Retrieve the data size of a media entry.
@@ -143,6 +160,50 @@
   )
 )
 
+;; Add media to favorites
+(define-public (add-to-favorites (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Validate media existence and access rights
+    (asserts! (is-media-present? id) ERR_MEDIA_NOT_FOUND)
+    (asserts! (has-read-access? id tx-sender) ERR_ACCESS_DENIED)
+    (asserts! (not (is-favorite? id tx-sender)) ERR_ALREADY_FAVORITE)
+
+    ;; Add to favorites
+    (map-insert user-favorites
+      { user: tx-sender, media-id: id }
+      {
+        favorited-at: block-height,
+        last-updated: block-height
+      }
+    )
+    (ok true)
+  )
+)
+
+;; Remove media from favorites
+(define-public (remove-from-favorites (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Validate media existence and favorite status
+    (asserts! (is-media-present? id) ERR_MEDIA_NOT_FOUND)
+    (asserts! (is-favorite? id tx-sender) ERR_NOT_FAVORITE)
+
+    ;; Remove from favorites
+    (map-delete user-favorites { user: tx-sender, media-id: id })
+    (ok true)
+  )
+)
+
+;; Check if media is in user's favorites
+(define-read-only (check-favorite-status (id uint))
+  (ok (is-favorite? id tx-sender))
+)
+
 ;; Grant read access to a user for a specific media entry
 (define-public (grant-read-access (id uint) (user principal))
   (let
@@ -181,6 +242,11 @@
     
     ;; Revoke access rights
     (map-delete access-rights { id: id, user-principal: user })
+    ;; Also remove from favorites if it was favorited
+    (if (is-favorite? id user)
+      (map-delete user-favorites { user: user, media-id: id })
+      true
+    )
     (ok true)
   )
 )
@@ -264,6 +330,7 @@
     ;; Validate ownership and existence.
     (asserts! (is-media-present? id) ERR_MEDIA_NOT_FOUND)
     (asserts! (is-eq (get owner media-entry) tx-sender) ERR_UNAUTHORIZED)
+    
     ;; Remove media entry and all associated access rights
     (map-delete media-entries { id: id })
     (ok true)
