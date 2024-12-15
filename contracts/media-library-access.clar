@@ -220,3 +220,52 @@
     (ok true)
   )
 )
+
+;; Edit an existing media entry.
+(define-public (edit-media (id uint) (updated-name (string-ascii 64)) (updated-size uint) (updated-category (string-ascii 32)) (updated-overview (string-ascii 128)) (updated-tags (list 10 (string-ascii 32))))
+  (let
+    (
+      (media-info (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Validate ownership and inputs.
+    (asserts! (is-media-present? id) ERR_MEDIA_NOT_FOUND)
+    (asserts! (is-eq (get owner media-info) tx-sender) ERR_UNAUTHORIZED)
+    (asserts! (> (len updated-name) u0) ERR_INVALID_NAME)
+    (asserts! (< (len updated-name) u65) ERR_INVALID_NAME)
+    (asserts! (> updated-size u0) ERR_INVALID_SIZE)
+    (asserts! (< updated-size u1000000000) ERR_INVALID_SIZE)
+    (asserts! (> (len updated-category) u0) ERR_INVALID_CATEGORY)
+    (asserts! (< (len updated-category) u33) ERR_INVALID_CATEGORY)
+    (asserts! (> (len updated-overview) u0) ERR_INVALID_NAME)
+    (asserts! (< (len updated-overview) u129) ERR_INVALID_NAME)
+    (asserts! (validate-tag-set updated-tags) ERR_INVALID_NAME)
+
+    ;; Update media entry.
+    (map-set media-entries
+      { id: id }
+      (merge media-info { 
+        name: updated-name, 
+        data-size: updated-size, 
+        category: updated-category, 
+        overview: updated-overview, 
+        tags-list: updated-tags 
+      })
+    )
+    (ok true)
+  )
+)
+
+;; Delete a media entry.
+(define-public (delete-media (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Validate ownership and existence.
+    (asserts! (is-media-present? id) ERR_MEDIA_NOT_FOUND)
+    (asserts! (is-eq (get owner media-entry) tx-sender) ERR_UNAUTHORIZED)
+    ;; Remove media entry and all associated access rights
+    (map-delete media-entries { id: id })
+    (ok true)
+  )
+)
