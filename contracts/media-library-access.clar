@@ -416,3 +416,87 @@
     (ok (get owner media-entry))
   )
 )
+
+;; Refactor: Introduce a general method for checking access rights.
+(define-private (check-access-rights (id uint) (user principal))
+  (let
+    (
+      (access-info (unwrap! (map-get? access-rights { id: id, user-principal: user }) ERR_ACCESS_DENIED))
+    )
+    ;; Return the access status for the user.
+    (ok (get can-access access-info))
+)
+)
+
+;; UI enhancement: Add a media preview option.
+(define-public (preview-media (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Return preview information for the media.
+    (ok (get overview media-entry))
+)
+)
+
+;; UI Improvement: Display Media Overview in Search Results
+(define-public (display-media-overview (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Show media overview as part of the search results
+    (ok (get overview media-entry))
+  )
+)
+
+;; Enhance Security: Adding Address Validation for Media Ownership
+(define-public (validate-media-owner-address (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Enhance security by validating the address of the owner
+    (asserts! (is-eq (get owner media-entry) tx-sender) ERR_UNAUTHORIZED)
+    (ok true)
+  )
+)
+
+;; UI Enhancement: Show Media Tags
+(define-public (show-media-tags (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Display tags associated with the media entry
+    (ok (get tags-list media-entry))
+  )
+)
+
+;; Security: Prevent Unauthorized Media Transfer
+(define-public (transfer-media-ownership (id uint) (new-owner principal))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Prevent unauthorized transfer of media ownership
+    (asserts! (is-authorized-owner? id tx-sender) ERR_UNAUTHORIZED)
+    (map-insert media-entries
+      { id: id }
+      (merge media-entry { owner: new-owner })
+    )
+    (ok true)
+  )
+)
+
+;; UI Improvement: Show Media Details in Search Results
+(define-public (display-media-details (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Display all details about media entry
+    (ok media-entry)
+  )
+)
+
