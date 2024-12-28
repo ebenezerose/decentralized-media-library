@@ -336,3 +336,83 @@
     (ok true)
   )
 )
+
+;; Optimized function to retrieve media by ID without redundant checks.
+(define-public (get-media (id uint))
+  (match (map-get? media-entries { id: id })
+    media-info (ok media-info)
+    (err ERR_MEDIA_NOT_FOUND)
+  )
+)
+
+;; Function to include a detailed description of the media entry.
+(define-public (get-media-description (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    (ok (get overview media-entry))
+  )
+)
+
+;; UI function to display full media information.
+(define-public (display-media-info (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    (ok (merge media-entry { description: (get overview media-entry) }))
+  )
+)
+
+;; Refactor for checking if the user has read access to a media entry.
+(define-private (check-media-access (id uint) (user principal))
+  (match (map-get? access-rights { id: id, user-principal: user })
+    access-info (get can-access access-info)
+    false
+  )
+)
+
+;; Function to display all tags of a media entry.
+(define-public (display-media-tags (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    (ok (get tags-list media-entry))
+  )
+)
+
+;; Refactor: Enhance the logic for removing media from favorites.
+(define-public (remove-favorite-media (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    ;; Validate and remove from favorites.
+    (asserts! (is-favorite? id tx-sender) ERR_NOT_FAVORITE)
+    (map-delete user-favorites { user: tx-sender, media-id: id })
+    (ok true)
+  )
+)
+
+;; Access control: Ensure only the owner can transfer media.
+(define-public (authorize-media-transfer (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    (asserts! (is-eq (get owner media-entry) tx-sender) ERR_UNAUTHORIZED)
+    (ok true)
+  )
+)
+
+;; Function to display the current owner of a media entry.
+(define-public (get-media-owner (id uint))
+  (let
+    (
+      (media-entry (unwrap! (map-get? media-entries { id: id }) ERR_MEDIA_NOT_FOUND))
+    )
+    (ok (get owner media-entry))
+  )
+)
